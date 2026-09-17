@@ -5,98 +5,104 @@ const RiskScore = require("../models/RiskScore");
 const { fetchZoneTelemetry } = require("../services/openMeteoService");
 const { dispatchAlertsForZone } = require("../services/alert_service");
 
-function startTelemetryCron(io) {
-  console.log("⏱️ Telemetry Cron initialized: Running every 15 minutes.");
+// Live on Render: https://sih-26001ls.onrender.com | Local: set ML_SERVICE_URL in server/.env
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || "http://127.0.0.1:5001").replace(/\/+$/, "");
 
-  // Runs every 15 minutes: '*/15 * * * *'
-  cron.schedule("*/15 * * * *", async () => {
-    console.log("📡 Executing 15-minute Open-Meteo automated risk evaluation...");
-
-    try {
-      const zones = await Zone.find({});
-
-      for (const zone of zones) {
-        // 1. Fetch live telemetry from Open-Meteo
-        const telemetry = await fetchZoneTelemetry(zone.lat, zone.lng);
-
-        // 2. Predict risk using Python XGBoost ML API
-        let calculatedRisk = 0.35;
-        try {
-          const mlRes = await axios.post("http://127.0.0.1:5001/predict", {
-            precipitation_mm: telemetry.precipitation_mm || 0.0,
-            soil_moisture: telemetry.soil_moisture || 0.20,
-            slope_angle: zone.slopeAngle || 35.0,
-            elevation: zone.elevation || 1200.0,
-          });
-
-          calculatedRisk = parseFloat(
-            (mlRes.data.riskProbability ?? mlRes.data.probability ?? 0.35).toFixed(2)
-          );
-        } catch (mlErr) {
-          console.error(
-            `⚠️ ML Service unreachable for ${zone.name}, applying fallback calculation:`,
-            mlErr.message
-          );
-          // Fallback heuristic if Python service is offline
-          const precipScore = Math.min(1.0, (telemetry.precipitation_mm || 0) / 50);
-          const soilScore = Math.min(1.0, (telemetry.soil_moisture || 0.2) / 0.5);
-          calculatedRisk = parseFloat(
-            Math.min(0.98, precipScore * 0.5 + soilScore * 0.5).toFixed(2)
-          );
-        }
-
-        // Determine Risk Tier
-        let tier = "LOW";
-        if (calculatedRisk >= 0.75) tier = "CRITICAL";
-        else if (calculatedRisk >= 0.50) tier = "HIGH";
-        else if (calculatedRisk >= 0.25) tier = "MEDIUM";
-
-        // 3. Save updated risk score entry in MongoDB
-        const newScore = await RiskScore.create({
-          zoneId: zone._id,
-          riskProbability: calculatedRisk,
-          riskTier: tier,
-          telemetry,
-          timestamp: new Date(),
-        });
-
-        // 4. Update parent zone state
-        zone.currentRiskScore = calculatedRisk;
-        zone.currentTier = tier;
-        await zone.save();
-
-        // 5. Broadcast real-time update to Leaflet map via Socket.io
-        if (io) {
-          io.emit("risk_update", {
-            zoneId: zone._id,
-            zoneName: zone.name,
-            riskProbability: calculatedRisk,
-            riskTier: tier,
-            telemetry,
-            timestamp: newScore.timestamp,
-          });
-        }
-
-        // 6. Dispatch SMS Alerts via Fast2SMS if risk exceeds alert thresholds (HIGH / CRITICAL)
-        if (calculatedRisk >= 0.50) {
-          console.log(`🚨 Triggering emergency SMS dispatches for High Risk Zone: ${zone.name}`);
-          
-          // Provide default/fallback contacts if arrays are unpopulated
-          const policeStations = zone.policeStations || [];
-          const publicSubscribers = zone.publicSubscribers || [];
-
-          await dispatchAlertsForZone({
-            zone,
-            riskProbability: calculatedRisk,
-            policeStations,
-            publicSubscribers,
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Cron Execution Error:", err);
-    }
-  });
+function tierFor(prob) {
+  if (prob >= 0.75) return "CRITICAL";
+  if (prob >= 0.5) return "HIGH";
+  if (prob >= 0.25) return "MEDIUM";
+  return "LOW";
 }
 
-module.exports = { startTelemetryCron };
+async function evaluateAllZones(io) {
+  console.log("📡 Running Open-Meteo + XGBoost risk evaluation...");
+
+  try {
+    const zones = await Zone.find({});
+
+    for (const zone of zones) {
+      // 1. Fetch live telemetry from Open-Meteo
+      const telemetry = await fetchZoneTelemetry(zone.lat, zone.lng);
+
+      const features = {
+        precipitation_mm: telemetry.precipitation_mm || 0.0,
+        soil_moisture: telemetry.soil_moisture || 0.2,
+        slope_angle: zone.slopeDegrees ?? 35.0,
+        elevation: zone.elevationM ?? 1200.0,
+      };
+
+      // 2. Predict risk with the XGBoost ML service
+      let calculatedRisk;
+      let tier;
+      let factors = [];
+      let modelUsed = "xgboost";
+
+      try {
+        // Timeout is long because a sleeping free Render instance takes ~50s to wake up
+        const mlRes = await axios.post(`${ML_SERVICE_URL}/predict`, features, { timeout: 60000 });
+        calculatedRisk = Number(mlRes.data.riskProbability);
+        tier = mlRes.data.riskTier || tierFor(calculatedRisk);
+        factors = mlRes.data.topContributingFactors || [];
+      } catch (mlErr) {
+        modelUsed = "fallback_heuristic";
+        console.error(`⚠️ ML service unreachable for ${zone.name} (${ML_SERVICE_URL}): ${mlErr.message}`);
+        const precipScore = Math.min(1.0, features.precipitation_mm / 50);
+        const soilScore = Math.min(1.0, features.soil_moisture / 0.5);
+        calculatedRisk = parseFloat(Math.min(0.98, precipScore * 0.5 + soilScore * 0.5).toFixed(2));
+        tier = tierFor(calculatedRisk);
+      }
+
+      console.log(`✅ ${zone.name}: ${calculatedRisk} (${tier}) via ${modelUsed}`);
+
+      // 3. Save the score in MongoDB
+      const newScore = await RiskScore.create({
+        zoneId: zone._id,
+        riskProbability: calculatedRisk,
+        riskTier: tier,
+        topContributingFactors: factors,
+        source: "live_prediction",
+        inputSnapshot: { ...features, model: modelUsed, telemetry },
+      });
+
+      // 4. Broadcast real-time update to the Leaflet map via Socket.io
+      if (io) {
+        io.emit("risk_update", {
+          zoneId: zone._id,
+          zoneName: zone.name,
+          riskProbability: calculatedRisk,
+          riskTier: tier,
+          topContributingFactors: factors,
+          model: modelUsed,
+          telemetry,
+          timestamp: newScore.createdAt,
+        });
+      }
+
+      // 5. Dispatch SMS alerts if risk is HIGH or CRITICAL
+      if (calculatedRisk >= 0.5) {
+        console.log(`🚨 Triggering emergency SMS dispatches for High Risk Zone: ${zone.name}`);
+        await dispatchAlertsForZone({
+          zone,
+          riskProbability: calculatedRisk,
+          policeStations: zone.policeStations || [],
+          publicSubscribers: zone.publicSubscribers || [],
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Cron Execution Error:", err);
+  }
+}
+
+function startTelemetryCron(io) {
+  console.log(`⏱️ Telemetry cron initialized (every 15 min). ML service: ${ML_SERVICE_URL}`);
+
+  // Score once shortly after startup so the map has fresh data immediately
+  setTimeout(() => evaluateAllZones(io), 10000);
+
+  // Then every 15 minutes
+  cron.schedule("*/15 * * * *", () => evaluateAllZones(io));
+}
+
+module.exports = { startTelemetryCron, evaluateAllZones };

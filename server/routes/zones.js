@@ -10,7 +10,7 @@ router.get("/", async (req, res) => {
     const zones = await Zone.find({});
     const zonesWithRisk = await Promise.all(
       zones.map(async (zone) => {
-        const latest = await RiskScore.findOne({ zoneId: zone._id }).sort({ timestamp: -1 });
+        const latest = await RiskScore.findOne({ zoneId: zone._id }).sort({ createdAt: -1 });
         return {
           ...zone.toObject(),
           currentRiskScore: latest || null
