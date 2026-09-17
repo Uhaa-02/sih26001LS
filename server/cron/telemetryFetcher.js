@@ -3,6 +3,7 @@ const axios = require("axios");
 const Zone = require("../models/Zone");
 const RiskScore = require("../models/RiskScore");
 const { fetchZoneTelemetry } = require("../services/openMeteoService");
+const { fetchZoneTerrain } = require("../services/terrainService");
 const { dispatchAlertsForZone } = require("../services/alert_service");
 
 // Live on Render: https://sih-26001ls.onrender.com | Local: set ML_SERVICE_URL in server/.env
@@ -22,6 +23,19 @@ async function evaluateAllZones(io) {
     const zones = await Zone.find({});
 
     for (const zone of zones) {
+      // 0. One-time terrain lookup (Copernicus DEM) — saved on the zone, so it runs only once per zone
+      if (zone.elevationM == null || zone.slopeDegrees == null) {
+        try {
+          const terrain = await fetchZoneTerrain(zone.lat, zone.lng);
+          zone.elevationM = terrain.elevationM;
+          zone.slopeDegrees = terrain.slopeDegrees;
+          await zone.save();
+          console.log(`🏔️ Terrain saved for ${zone.name}: elevation ${terrain.elevationM} m, slope ${terrain.slopeDegrees}°`);
+        } catch (terrainErr) {
+          console.warn(`[Terrain] Using defaults for ${zone.name}: ${terrainErr.message}`);
+        }
+      }
+
       // 1. Fetch live telemetry from Open-Meteo
       const telemetry = await fetchZoneTelemetry(zone.lat, zone.lng);
 
