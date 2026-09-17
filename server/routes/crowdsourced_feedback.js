@@ -1,74 +1,64 @@
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
-const axios = require("axios");
 const Incident = require("../models/Incident");
 const RiskScore = require("../models/RiskScore");
 
 const router = express.Router();
+const upload = multer({ dest: "public/uploads/" });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/incidents/"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|webp/;
-    cb(null, allowed.test(path.extname(file.originalname).toLowerCase()));
-  },
-});
-
-// POST /api/feedback/report
+// POST /api/feedback/report - Handle photo and observation upload
 router.post("/report", upload.single("photo"), async (req, res) => {
   try {
-    const { zoneId, description, severityEstimate, lat, lng } = req.body;
-    if (!zoneId || severityEstimate === undefined) {
-      return res.status(400).json({ error: "zoneId and severityEstimate are required" });
+    const { zoneId, severityEstimate, description } = req.body;
+
+    if (!zoneId) {
+      return res.status(400).json({ error: "zoneId is required" });
     }
 
+    const sev = parseFloat(severityEstimate) || 0.5;
+    const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    // Create incident log
     const incident = await Incident.create({
       zoneId,
-      description,
-      severityEstimate: parseFloat(severityEstimate),
-      photoUrl: req.file ? `/uploads/incidents/${req.file.filename}` : null,
-      location: { lat: parseFloat(lat), lng: parseFloat(lng) },
-      reportedAt: new Date(),
-      status: "pending_review",
+      severityEstimate: sev,
+      description: description || "Citizen Ground Report",
+      photoUrl,
+      reportedAt: new Date()
     });
 
-    const currentRisk = await RiskScore.findOne({ zoneId }).sort({ createdAt: -1 });
-    if (!currentRisk) {
-      return res.status(200).json({ incident, note: "No existing risk score to nudge yet." });
-    }
+    // Calculate nudged risk probability
+    const nudgedProb = Math.min(0.95, 0.3 + (sev * 0.6));
+    let tier = "MEDIUM";
+    if (nudgedProb >= 0.75) tier = "CRITICAL";
+    else if (nudgedProb >= 0.50) tier = "HIGH";
 
-    const { data } = await axios.post(`${process.env.ML_SERVICE_URL}/nudge`, {
-      zone_id: zoneId,
-      ground_truth_severity: incident.severityEstimate,
-      current_score: currentRisk.riskProbability,
-    });
-
+    // Save updated risk score
     const updatedScore = await RiskScore.create({
       zoneId,
-      riskProbability: data.adjusted_score,
-      source: "crowdsourced_nudge",
-      createdAt: new Date(),
+      riskProbability: nudgedProb,
+      riskTier: tier,
+      timestamp: new Date()
     });
 
-    incident.status = "applied_to_model";
-    await incident.save();
+    // Broadcast via Socket.io
+    if (req.io) {
+      req.io.emit("risk_update", {
+        zoneId,
+        riskProbability: nudgedProb,
+        riskTier: tier,
+        source: "Citizen Photo Ground-Truth"
+      });
+    }
 
-    req.app.get("io")?.emit("risk_update", {
-      zoneId,
-      riskProbability: updatedScore.riskProbability,
-      source: "crowdsourced_nudge",
+    return res.json({
+      success: true,
+      incident,
+      updatedScore
     });
-
-    res.status(201).json({ incident, updatedScore });
   } catch (err) {
-    console.error("Feedback processing failed:", err.message);
-    res.status(500).json({ error: "Failed to process crowdsourced report" });
+    console.error("Crowdsourced Feedback Error:", err);
+    return res.status(500).json({ error: "Failed to process crowdsourced report: " + err.message });
   }
 });
 

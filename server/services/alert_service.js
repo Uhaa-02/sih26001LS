@@ -1,12 +1,5 @@
-const twilio = require("twilio");
+const axios = require("axios");
 const Alert = require("../models/Alert");
-
-function getClient() {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    return null; // allows the server to boot without Twilio creds set yet
-  }
-  return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-}
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -22,13 +15,53 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 
 const RISK_THRESHOLDS = { HIGH: 0.5, CRITICAL: 0.75 };
 
+/**
+ * Sends SMS via Fast2SMS API (Quick SMS route)
+ */
 async function sendSms(to, body) {
-  const client = getClient();
-  if (!client) {
-    console.warn(`[SMS SKIPPED - no Twilio creds] Would send to ${to}: ${body}`);
-    return { sid: "SIMULATED_NO_CREDS" };
+  const apiKey = process.env.FAST2SMS_API_KEY;
+
+  if (!apiKey) {
+    console.warn(`[SMS SKIPPED - no FAST2SMS_API_KEY] Would send to ${to}: ${body}`);
+    return { sid: "SIMULATED_NO_FAST2SMS_KEY" };
   }
-  return client.messages.create({ to, from: process.env.TWILIO_FROM_NUMBER, body });
+
+  // Clean phone number: remove non-digits (+91, spaces) and pick last 10 digits
+  const cleanPhone = String(to).replace(/\D/g, "").slice(-10);
+
+  if (cleanPhone.length !== 10) {
+    throw new Error(`Invalid phone number length: ${to}`);
+  }
+
+  try {
+    const response = await axios.post(
+      "https://www.fast2sms.com/dev/bulkV2",
+      {
+        route: "q",
+        message: body,
+        language: "english",
+        flash: 0,
+        numbers: cleanPhone,
+      },
+      {
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.data && response.data.return) {
+      console.log(`✅ Fast2SMS successfully sent to ${cleanPhone}`);
+      return { sid: response.data.request_id || "FAST2SMS_SUCCESS" };
+    } else {
+      throw new Error(response.data.message || "Fast2SMS dispatch failed");
+    }
+  } catch (err) {
+    const errMsg = err.response?.data?.message || err.message;
+    console.error(`❌ Fast2SMS Error (${cleanPhone}):`, errMsg);
+    throw new Error(errMsg);
+  }
 }
 
 async function findNearestPoliceStations(zoneLat, zoneLng, policeStations, radiusKm = 15) {
