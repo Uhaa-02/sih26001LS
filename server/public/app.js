@@ -73,7 +73,7 @@ async function loadZones() {
         zoneName: zone.name,
         riskProbability: prob,
         riskTier: tier,
-        telemetry: riskScore.telemetry || { precipitation_mm: 0, soil_moisture: 0.20 }
+        telemetry: (riskScore.inputSnapshot && riskScore.inputSnapshot.telemetry) || riskScore.telemetry || { precipitation_mm: 0, soil_moisture: 0.20 }
       });
     });
       if (monitoredZones.length > 0) {

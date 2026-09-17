@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const Incident = require("../models/Incident");
 const RiskScore = require("../models/RiskScore");
+const Zone = require("../models/Zone");
 
 const router = express.Router();
 const upload = multer({ dest: "public/uploads/" });
@@ -33,21 +34,30 @@ router.post("/report", upload.single("photo"), async (req, res) => {
     if (nudgedProb >= 0.75) tier = "CRITICAL";
     else if (nudgedProb >= 0.50) tier = "HIGH";
 
+    // Keep the latest live telemetry so the dashboard card doesn't reset to zeros
+    const zone = await Zone.findById(zoneId);
+    const previous = await RiskScore.findOne({ zoneId }).sort({ createdAt: -1 });
+    const lastTelemetry = previous && previous.inputSnapshot ? previous.inputSnapshot.telemetry : undefined;
+
     // Save updated risk score
     const updatedScore = await RiskScore.create({
       zoneId,
       riskProbability: nudgedProb,
       riskTier: tier,
-      timestamp: new Date()
+      source: "crowdsourced_nudge",
+      inputSnapshot: { severityEstimate: sev, incidentId: incident._id, telemetry: lastTelemetry }
     });
 
     // Broadcast via Socket.io
     if (req.io) {
       req.io.emit("risk_update", {
         zoneId,
+        zoneName: zone ? zone.name : undefined,
         riskProbability: nudgedProb,
         riskTier: tier,
-        source: "Citizen Photo Ground-Truth"
+        telemetry: lastTelemetry,
+        source: "Citizen Photo Ground-Truth",
+        timestamp: updatedScore.createdAt
       });
     }
 
