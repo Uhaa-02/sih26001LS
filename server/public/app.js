@@ -101,15 +101,15 @@ function renderTelemetryCard(data) {
 
   const cardContent = `
     <div class="flex justify-between items-center mb-2">
-      <span class="font-bold text-sm text-slate-800">${data.zoneName || 'Zone ' + data.zoneId}</span>
+      <span class="font-bold text-sm text-gov-900">${data.zoneName || 'Zone ' + data.zoneId}</span>
       <span class="px-2 py-0.5 text-xs font-bold rounded text-white" style="background-color: ${cardColor}">
         ${data.riskTier} (${(data.riskProbability * 100).toFixed(0)}%)
       </span>
     </div>
-    <div class="text-xs text-slate-600 space-y-1.5 border-t border-slate-200 pt-2">
-      <div class="flex justify-between"><span>Rainfall (Open-Meteo):</span> <strong class="text-slate-800">${data.telemetry?.precipitation_mm ?? 0} mm/h</strong></div>
-      <div class="flex justify-between"><span>Soil Moisture:</span> <strong class="text-slate-800">${data.telemetry?.soil_moisture ?? 0.2} m³/m³</strong></div>
-      <div class="flex justify-between text-slate-400 text-[10px]"><span>Last Polled:</span> <span>${new Date().toLocaleTimeString()}</span></div>
+    <div class="text-xs text-gov-950/70 space-y-1.5 border-t border-gov-100 pt-2">
+      <div class="flex justify-between"><span>Rainfall (Open-Meteo):</span> <strong class="text-gov-900">${data.telemetry?.precipitation_mm ?? 0} mm/h</strong></div>
+      <div class="flex justify-between"><span>Soil Moisture:</span> <strong class="text-gov-900">${data.telemetry?.soil_moisture ?? 0.2} m³/m³</strong></div>
+      <div class="flex justify-between text-gov-950/50 text-[10px]"><span>Last Polled:</span> <span>${new Date().toLocaleTimeString()}</span></div>
     </div>
   `;
 
@@ -118,7 +118,7 @@ function renderTelemetryCard(data) {
   } else {
     const newCard = document.createElement("div");
     newCard.id = `telemetry-card-${data.zoneId}`;
-    newCard.className = "p-3.5 bg-slate-50 rounded-lg border border-slate-200 shadow-sm transition-all duration-300";
+    newCard.className = "p-3.5 bg-white rounded border border-gov-100 shadow-sm transition-all duration-300";
     newCard.innerHTML = cardContent;
     container.appendChild(newCard);
   }
@@ -143,8 +143,8 @@ socket.on('risk_update', (data) => {
   const feed = document.getElementById('dispatchFeed');
   if (feed) {
     const entry = document.createElement('div');
-    entry.className = `p-2 my-1 text-xs rounded bg-slate-800 border-l-4 ${
-      data.riskTier === 'CRITICAL' ? 'border-red-500 text-red-300' : 'border-blue-500 text-slate-200'
+    entry.className = `p-2 my-1 text-xs rounded bg-gov-900 border-l-4 ${
+      data.riskTier === 'CRITICAL' ? 'border-red-500 text-red-200' : 'border-saffron-400 text-gov-100'
     }`;
     entry.innerText = `[AUTO-TELEMETRY 15m] ${data.zoneName || 'Zone ' + data.zoneId}: Calculated risk probability updated to ${(data.riskProbability * 100).toFixed(0)}% (${data.riskTier})`;
     feed.prepend(entry);
@@ -199,7 +199,7 @@ async function sendChatbotIntent(intent) {
   if (!chatBox) return;
 
   const userBubble = document.createElement('div');
-  userBubble.className = 'p-2 my-1 text-xs rounded bg-blue-100 text-blue-900 self-end text-right';
+  userBubble.className = 'p-2 my-1 text-xs rounded bg-gov-100 text-gov-900 self-end text-right';
   userBubble.innerText = `Request: ${intent.replace('_', ' ')}`;
   chatBox.appendChild(userBubble);
 
@@ -212,13 +212,13 @@ async function sendChatbotIntent(intent) {
     const data = await res.json();
 
     const botBubble = document.createElement('div');
-    botBubble.className = 'p-2 my-1 text-xs rounded bg-slate-100 text-slate-800 font-mono whitespace-pre-line';
+    botBubble.className = 'p-2 my-1 text-xs rounded bg-white border border-gov-100 text-gov-950 font-mono whitespace-pre-line';
     botBubble.innerText = data.reply || 'No response received.';
     chatBox.appendChild(botBubble);
     chatBox.scrollTop = chatBox.scrollHeight;
   } catch (err) {
     const errBubble = document.createElement('div');
-    errBubble.className = 'p-2 my-1 text-xs rounded bg-red-100 text-red-800';
+    errBubble.className = 'p-2 my-1 text-xs rounded bg-red-50 border border-red-200 text-red-800';
     errBubble.innerText = 'Unable to fetch emergency data right now.';
     chatBox.appendChild(errBubble);
   }

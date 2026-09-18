@@ -4,143 +4,215 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CLAIRVEIL Ops Room — MoDNER Portal</title>
-  
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
+
+  <!-- Institutional typefaces -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gov: {
+              950: "#062240",   // deepest navy
+              900: "#0B3C6E",   // primary navy
+              800: "#104E8B",
+              100: "#DCE7F3",
+              50:  "#EEF3F9",
+            },
+            saffron: {
+              600: "#C2660A",
+              500: "#E8850C",
+              400: "#FF9933",
+              100: "#FDEBD5",
+            },
+            ashoka: "#0F5132",
+          },
+          fontFamily: {
+            sans: ['"Noto Sans"', "Segoe UI", "Arial", "sans-serif"],
+            serif: ['"Noto Serif"', "Georgia", "serif"],
+          },
+        },
+      },
+    };
+  </script>
+
   <style>
-    #map {
-      height: 480px;
-      width: 100%;
-      border-radius: 0.5rem;
-    }
+    body { background-color: #EEF3F9; background-image: linear-gradient(180deg, #E7EEF7 0%, #F5F8FC 320px, #F5F8FC 100%); }
+    #map { height: 480px; width: 100%; border-radius: 0.375rem; }
+    /* Tricolour hairline, as used on Indian government portals */
+    .tricolour { height: 4px; background: linear-gradient(to right, #FF9933 0 33.33%, #FFFFFF 33.33% 66.66%, #138808 66.66% 100%); }
+    /* Section heading with a saffron marker */
+    .sec-title { position: relative; padding-left: 0.85rem; }
+    .sec-title::before { content: ""; position: absolute; left: 0; top: 0.18rem; bottom: 0.18rem; width: 4px; background: #E8850C; border-radius: 2px; }
+    .panel { background: #fff; border: 1px solid #CBD9E8; border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(6,34,64,.06); }
+    .panel-head { background: #F3F7FC; border-bottom: 1px solid #CBD9E8; border-radius: 0.5rem 0.5rem 0 0; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 9999px; background: #0B3C6E; cursor: pointer; }
+    .leaflet-popup-content-wrapper { border-radius: 6px; }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+<body class="text-gov-950 font-sans min-h-screen flex flex-col">
 
-  <!-- Top Navigation Header -->
-  <header class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center space-x-3">
-        <div class="bg-blue-900 text-white font-black px-3 py-1.5 rounded text-lg tracking-wider">
-          CLAIRVEIL
+  <div class="tricolour"></div>
+
+  <!-- Government identity strip -->
+  <div class="bg-gov-950 text-gov-100 text-[11px]">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-1.5 flex flex-wrap items-center justify-between gap-2">
+      <span class="tracking-wide">भारत सरकार &nbsp;|&nbsp; Government of India &nbsp;·&nbsp; Ministry of Development of North Eastern Region</span>
+      <span class="hidden md:inline text-gov-100/80">Prototype — Smart India Hackathon 2026</span>
+    </div>
+  </div>
+
+  <!-- Main masthead -->
+  <header class="bg-gov-900 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-white text-gov-900 grid place-items-center font-serif font-bold text-lg border-4 border-saffron-400 shrink-0">
+          CV
         </div>
         <div>
-          <span class="text-xs font-semibold uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-            MoDNER Portal
-          </span>
-          <p class="text-xs text-slate-500 mt-0.5">
-            Ministry of Development of North Eastern Region — Early Warning & Emergency Response System
+          <h1 class="font-serif text-2xl font-bold tracking-wide leading-none">CLAIRVEIL</h1>
+          <p class="text-[11px] text-gov-100 mt-1 leading-tight">
+            National Landslide Early Warning &amp; Emergency Response Portal — North Eastern Region
           </p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-6 text-xs text-slate-600">
-        <div class="flex items-center space-x-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>TELEMETRY ENGINE: <strong class="text-slate-800">Live (Open-Meteo)</strong></span>
-        </div>
-        <div class="hidden sm:block border-l border-slate-200 h-4"></div>
-        <div class="hidden sm:block">
-          <span>ML INTELLIGENCE: <strong class="text-slate-800">XGBoost Autonomous Active</strong></span>
-        </div>
+      <div class="flex flex-wrap items-center gap-2 text-[11px]">
+        <span class="inline-flex items-center gap-1.5 bg-gov-950/60 border border-white/15 rounded px-2.5 py-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          TELEMETRY: <strong class="font-semibold">Live (Open-Meteo)</strong>
+        </span>
+        <span class="inline-flex items-center gap-1.5 bg-gov-950/60 border border-white/15 rounded px-2.5 py-1">
+          <span class="w-2 h-2 rounded-full bg-saffron-400"></span>
+          ML ENGINE: <strong class="font-semibold">XGBoost Autonomous</strong>
+        </span>
+      </div>
+    </div>
+
+    <!-- Sub navigation bar -->
+    <div class="bg-gov-800 border-t border-white/10">
+      <div class="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-1 text-[12px] font-semibold overflow-x-auto">
+        <span class="px-3 py-2 bg-saffron-500 text-white rounded-t whitespace-nowrap">Operations Dashboard</span>
+        <a href="#telemetry" class="px-3 py-2 text-gov-100 hover:bg-white/10 whitespace-nowrap">Live Telemetry</a>
+        <a href="#reports" class="px-3 py-2 text-gov-100 hover:bg-white/10 whitespace-nowrap">Field Reports</a>
+        <a href="#dispatch" class="px-3 py-2 text-gov-100 hover:bg-white/10 whitespace-nowrap">Dispatch Feed</a>
       </div>
     </div>
   </header>
+
+  <!-- Advisory ribbon -->
+  <div class="bg-saffron-100 border-b border-saffron-500/30">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-2 text-[12px] text-saffron-600 flex items-center gap-2">
+      <span class="font-bold uppercase tracking-wide">Advisory</span>
+      <span class="text-gov-950/80">Risk scores are re-computed every 15 minutes from live rainfall, soil moisture and satellite terrain data. HIGH and CRITICAL zones trigger SMS dispatch.</span>
+    </div>
+  </div>
 
   <!-- Main Operational Dashboard -->
   <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
 
     <!-- Top Section: Geospatial Map + Right Action Columns -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      
+
       <!-- Map Column (7 cols) -->
-      <div class="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-bold text-slate-800 text-sm tracking-wide uppercase">
-            GEOSPATIAL RISK LAYER
+      <div class="lg:col-span-7 panel flex flex-col">
+        <div class="panel-head px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="sec-title font-bold text-gov-900 text-sm tracking-wide uppercase">
+            Geospatial Risk Layer
           </h2>
-          <div class="flex items-center space-x-3 text-xs">
-            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1"></span> Low (&lt;25%)</span>
+          <div class="flex items-center gap-3 text-[11px] text-gov-950/80">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-1"></span> Low (&lt;25%)</span>
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500 mr-1"></span> Med (25-50%)</span>
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-orange-500 mr-1"></span> High (50-75%)</span>
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-600 mr-1"></span> Critical (&gt;75%)</span>
           </div>
         </div>
-        
+
         <!-- Leaflet Map Container -->
-        <div id="map" class="z-10 shadow-inner"></div>
+        <div class="p-3">
+          <div id="map" class="z-10 border border-gov-100"></div>
+        </div>
       </div>
 
       <!-- Right Column: Ground-Truth & AI Assistant (5 cols) -->
       <div class="lg:col-span-5 space-y-6">
 
         <!-- Citizen Ground-Truth Photo Reporting -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-slate-800 text-sm">📸 Citizen Photo & Ground-Truth Report</h3>
-            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Human-in-the-Loop</span>
+        <div class="panel">
+          <div class="panel-head px-4 py-2.5 flex items-center justify-between">
+            <h3 class="sec-title font-bold text-gov-900 text-sm uppercase tracking-wide">Citizen Ground-Truth Report</h3>
+            <span class="text-[10px] font-semibold bg-gov-100 text-gov-900 px-2 py-0.5 rounded">Human-in-the-Loop</span>
           </div>
-          <p class="text-xs text-slate-500 mb-3">Upload ground imagery to verify risk and refine model predictions.</p>
 
-          <form id="groundReportForm" class="space-y-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Target Region / Zone</label>
-              <select id="reportZone" class="w-full text-xs border border-slate-300 rounded p-2 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white">
-                <option value="">Loading zones...</option>
-              </select>
-            </div>
+          <div class="p-4">
+            <p class="text-xs text-gov-950/70 mb-3">Upload ground imagery to verify risk and refine model predictions.</p>
 
-            <div>
-              <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <label>Severity Estimate (0.0 to 1.0)</label>
-                <span id="severityVal" class="text-blue-600 font-bold">0.50</span>
+            <form id="groundReportForm" class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-gov-900 mb-1">Target Region / Zone</label>
+                <select id="reportZone" class="w-full text-xs border border-gov-100 rounded p-2 focus:ring-2 focus:ring-gov-800 focus:outline-none bg-white">
+                  <option value="">Loading zones...</option>
+                </select>
               </div>
-              <input type="range" id="severityRange" min="0" max="1" step="0.05" value="0.5" class="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer" oninput="document.getElementById('severityVal').innerText = parseFloat(this.value).toFixed(2)" />
-            </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Field Observations / Description</label>
-              <textarea id="reportDesc" rows="2" class="w-full text-xs border border-slate-300 rounded p-2 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Describe soil movement, road cracks, mudslides, or rockfalls..."></textarea>
-            </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold text-gov-900 mb-1">
+                  <label>Severity Estimate (0.0 to 1.0)</label>
+                  <span id="severityVal" class="text-saffron-600 font-bold">0.50</span>
+                </div>
+                <input type="range" id="severityRange" min="0" max="1" step="0.05" value="0.5" class="w-full h-1.5 bg-gov-100 rounded appearance-none cursor-pointer" oninput="document.getElementById('severityVal').innerText = parseFloat(this.value).toFixed(2)" />
+              </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Disaster Photo Evidence</label>
-              <input type="file" id="photoUpload" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-            </div>
+              <div>
+                <label class="block text-xs font-semibold text-gov-900 mb-1">Field Observations / Description</label>
+                <textarea id="reportDesc" rows="2" class="w-full text-xs border border-gov-100 rounded p-2 focus:ring-2 focus:ring-gov-800 focus:outline-none" placeholder="Describe soil movement, road cracks, mudslides, or rockfalls..."></textarea>
+              </div>
 
-            <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2 px-4 rounded transition duration-150">
-              📷 Submit Ground Report & Nudge Risk Model
-            </button>
-          </form>
+              <div>
+                <label class="block text-xs font-semibold text-gov-900 mb-1">Disaster Photo Evidence</label>
+                <input type="file" id="photoUpload" accept="image/*" class="block w-full text-xs text-gov-950/70 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gov-100 file:text-gov-900 hover:file:bg-gov-50" />
+              </div>
+
+              <button type="submit" class="w-full bg-saffron-500 hover:bg-saffron-600 text-white font-bold text-xs py-2.5 px-4 rounded shadow-sm transition duration-150 uppercase tracking-wide">
+                Submit Ground Report &amp; Nudge Risk Model
+              </button>
+            </form>
+          </div>
         </div>
 
         <!-- MoDNER AI Assistant -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
-          <div>
-            <h3 class="font-bold text-slate-800 text-sm mb-1">🤖 MoDNER AI Emergency Assistant</h3>
-            <p class="text-xs text-slate-500 mb-3">Query real-time shelters, hospitals, and evacuation protocols.</p>
+        <div class="panel flex flex-col justify-between">
+          <div class="panel-head px-4 py-2.5">
+            <h3 class="sec-title font-bold text-gov-900 text-sm uppercase tracking-wide">MoDNER AI Emergency Assistant</h3>
+          </div>
 
-            <div id="chatMessages" class="h-32 overflow-y-auto border border-slate-100 bg-slate-50 rounded p-2 mb-3 text-xs space-y-2">
-              <div class="p-2 bg-blue-50 text-blue-900 rounded text-xs">
+          <div class="p-4">
+            <p class="text-xs text-gov-950/70 mb-3">Query real-time shelters, hospitals, and evacuation protocols.</p>
+
+            <div id="chatMessages" class="h-32 overflow-y-auto border border-gov-100 bg-gov-50 rounded p-2 mb-3 text-xs space-y-2">
+              <div class="p-2 bg-white border border-gov-100 text-gov-900 rounded text-xs">
                 Welcome to Clairveil Emergency Response. Click an option below or send a query for high-risk zones.
               </div>
             </div>
-          </div>
 
-          <div class="space-y-2">
             <div class="grid grid-cols-3 gap-1.5">
-              <button onclick="sendChatbotIntent('NEAREST_SHELTER')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1 px-2 rounded font-medium border border-slate-200">
-                🏫 Shelters
+              <button onclick="sendChatbotIntent('NEAREST_SHELTER')" class="bg-gov-50 hover:bg-gov-100 text-gov-900 text-xs py-1.5 px-2 rounded font-semibold border border-gov-100">
+                Shelters
               </button>
-              <button onclick="sendChatbotIntent('NEAREST_HOSPITAL')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1 px-2 rounded font-medium border border-slate-200">
-                🏥 Hospitals
+              <button onclick="sendChatbotIntent('NEAREST_HOSPITAL')" class="bg-gov-50 hover:bg-gov-100 text-gov-900 text-xs py-1.5 px-2 rounded font-semibold border border-gov-100">
+                Hospitals
               </button>
-              <button onclick="sendChatbotIntent('EVACUATION_STEPS')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1 px-2 rounded font-medium border border-slate-200">
-                🚨 Evacuation
+              <button onclick="sendChatbotIntent('EVACUATION_STEPS')" class="bg-gov-50 hover:bg-gov-100 text-gov-900 text-xs py-1.5 px-2 rounded font-semibold border border-gov-100">
+                Evacuation
               </button>
             </div>
           </div>
@@ -150,48 +222,77 @@
     </div>
 
     <!-- Middle Section: Autonomous Live Regional Telemetry Feed -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-      <div class="flex items-center justify-between mb-4">
+    <div id="telemetry" class="panel">
+      <div class="panel-head px-5 py-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 class="font-bold text-slate-800 text-base">📡 Live Regional Telemetry Feed</h3>
-          <p class="text-xs text-slate-500">Autonomous Open-Meteo polling active (Auto-evaluates every 15 minutes)</p>
+          <h3 class="sec-title font-bold text-gov-900 text-sm uppercase tracking-wide">Live Regional Telemetry Feed</h3>
+          <p class="text-[11px] text-gov-950/70 mt-1 pl-[0.85rem]">Autonomous Open-Meteo polling active — auto-evaluated every 15 minutes</p>
         </div>
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-          <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span class="w-2 h-2 mr-1.5 bg-emerald-600 rounded-full animate-pulse"></span>
           Autonomous Pipeline Active
         </span>
       </div>
 
-      <div id="liveTelemetryCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center col-span-full">
-          <p class="text-xs text-slate-500 font-medium">Monitoring Status</p>
-          <p class="text-sm font-semibold text-slate-700 mt-1">Connecting to live Open-Meteo telemetry stream...</p>
+      <div class="p-5">
+        <div id="liveTelemetryCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-4 bg-gov-50 rounded border border-gov-100 text-center col-span-full">
+            <p class="text-xs text-gov-950/70 font-semibold">Monitoring Status</p>
+            <p class="text-sm font-semibold text-gov-900 mt-1">Connecting to live Open-Meteo telemetry stream...</p>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Bottom Logs Section -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      
+
       <!-- Verified Field Reports -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <h3 class="font-bold text-slate-800 text-sm mb-3">📷 Verified Field Photo Reports</h3>
-        <div id="photoReportsFeed" class="text-xs text-slate-500 space-y-2">
-          <p class="italic text-slate-400">No field reports uploaded yet today.</p>
+      <div id="reports" class="panel">
+        <div class="panel-head px-4 py-2.5">
+          <h3 class="sec-title font-bold text-gov-900 text-sm uppercase tracking-wide">Verified Field Photo Reports</h3>
+        </div>
+        <div class="p-4">
+          <div id="photoReportsFeed" class="text-xs text-gov-950/70 space-y-2">
+            <p class="italic text-gov-950/50">No field reports uploaded yet today.</p>
+          </div>
         </div>
       </div>
 
       <!-- Geo-Fenced Dispatch Feed -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <h3 class="font-bold text-slate-800 text-sm mb-3">📟 Geo-Fenced Dispatch & SMS Broadcast Feed</h3>
-        <div id="dispatchFeed" class="h-32 overflow-y-auto bg-slate-900 text-slate-200 font-mono p-2 rounded text-xs space-y-1">
-          <div class="text-slate-400">[System Ready] SMS gateway listening for HIGH / CRITICAL risk threshold breaches...</div>
+      <div id="dispatch" class="panel">
+        <div class="panel-head px-4 py-2.5">
+          <h3 class="sec-title font-bold text-gov-900 text-sm uppercase tracking-wide">Geo-Fenced Dispatch &amp; SMS Broadcast Feed</h3>
+        </div>
+        <div class="p-4">
+          <div id="dispatchFeed" class="h-32 overflow-y-auto bg-gov-950 text-gov-100 font-mono p-2.5 rounded text-xs space-y-1 border border-gov-900">
+            <div class="text-gov-100/70">[System Ready] SMS gateway listening for HIGH / CRITICAL risk threshold breaches...</div>
+          </div>
         </div>
       </div>
 
     </div>
 
   </main>
+
+  <!-- Portal footer -->
+  <footer class="mt-6 bg-gov-950 text-gov-100">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px]">
+      <div>
+        <p class="font-serif font-bold text-white text-sm mb-1">CLAIRVEIL</p>
+        <p class="leading-relaxed text-gov-100/80">Live AI landslide early warning and emergency response system for the North Eastern Region. Prototype built for Smart India Hackathon 2026.</p>
+      </div>
+      <div>
+        <p class="font-semibold text-white mb-1 uppercase tracking-wide">Data Sources</p>
+        <p class="text-gov-100/80 leading-relaxed">Open-Meteo Weather &amp; Soil Moisture API · Copernicus GLO-90 Digital Elevation Model · Geological Survey of India landslide inventory (planned)</p>
+      </div>
+      <div>
+        <p class="font-semibold text-white mb-1 uppercase tracking-wide">Disclaimer</p>
+        <p class="text-gov-100/80 leading-relaxed">Demonstration prototype. Risk scores are model estimates and are not an official Government of India advisory. Follow instructions issued by your District Disaster Management Authority.</p>
+      </div>
+    </div>
+    <div class="tricolour"></div>
+  </footer>
 
   <!-- Leaflet JS & Socket.io JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
