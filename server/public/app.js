@@ -97,19 +97,46 @@ function renderTelemetryCard(data) {
   }
 
   let card = document.getElementById(`telemetry-card-${data.zoneId}`);
-  const cardColor = getTierColor(data.riskTier);
+  const tierColor = getTierColor(data.riskTier);
+  const pct = (data.riskProbability * 100).toFixed(0);
+  const rain = data.telemetry?.precipitation_mm ?? 0;
+  const soil = data.telemetry?.soil_moisture ?? 0.2;
 
   const cardContent = `
-    <div class="flex justify-between items-center mb-2">
-      <span class="font-bold text-sm text-gov-900">${data.zoneName || 'Zone ' + data.zoneId}</span>
-      <span class="px-2 py-0.5 text-xs font-bold rounded text-white" style="background-color: ${cardColor}">
-        ${data.riskTier} (${(data.riskProbability * 100).toFixed(0)}%)
-      </span>
-    </div>
-    <div class="text-xs text-gov-950/70 space-y-1.5 border-t border-gov-100 pt-2">
-      <div class="flex justify-between"><span>Rainfall (Open-Meteo):</span> <strong class="text-gov-900">${data.telemetry?.precipitation_mm ?? 0} mm/h</strong></div>
-      <div class="flex justify-between"><span>Soil Moisture:</span> <strong class="text-gov-900">${data.telemetry?.soil_moisture ?? 0.2} m³/m³</strong></div>
-      <div class="flex justify-between text-gov-950/50 text-[10px]"><span>Last Polled:</span> <span>${new Date().toLocaleTimeString()}</span></div>
+    <div class="tcard-accent" style="background-color: ${tierColor}"></div>
+    <div class="p-3.5">
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <div class="min-w-0">
+          <p class="font-bold text-sm text-gov-900 leading-tight truncate">${data.zoneName || 'Zone ' + data.zoneId}</p>
+          <p class="text-[10px] uppercase tracking-wide text-gov-950/50 mt-0.5">Monitored zone</p>
+        </div>
+        <span class="shrink-0 px-2 py-0.5 text-[10px] font-bold rounded text-white uppercase tracking-wide" style="background-color: ${tierColor}">
+          ${data.riskTier}
+        </span>
+      </div>
+
+      <div class="flex items-end gap-2 mb-3">
+        <span class="text-3xl font-bold leading-none" style="color: ${tierColor}">${pct}<span class="text-lg">%</span></span>
+        <span class="text-[10px] text-gov-950/50 pb-1">risk probability</span>
+      </div>
+      <div class="w-full h-1.5 rounded-full bg-gov-100 overflow-hidden mb-3">
+        <div class="h-full rounded-full" style="width: ${pct}%; background-color: ${tierColor}"></div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="tcard-metric p-2">
+          <p class="text-[10px] text-gov-950/50 uppercase tracking-wide">Rainfall</p>
+          <p class="text-sm font-bold text-gov-900 leading-tight">${rain}<span class="text-[10px] font-semibold text-gov-950/50"> mm/h</span></p>
+        </div>
+        <div class="tcard-metric p-2">
+          <p class="text-[10px] text-gov-950/50 uppercase tracking-wide">Soil moisture</p>
+          <p class="text-sm font-bold text-gov-900 leading-tight">${soil}<span class="text-[10px] font-semibold text-gov-950/50"> m³/m³</span></p>
+        </div>
+      </div>
+
+      <p class="text-[10px] text-gov-950/50 mt-2.5 pt-2 border-t border-gov-100 flex justify-between">
+        <span>Last polled</span><span>${new Date().toLocaleTimeString()}</span>
+      </p>
     </div>
   `;
 
@@ -118,7 +145,7 @@ function renderTelemetryCard(data) {
   } else {
     const newCard = document.createElement("div");
     newCard.id = `telemetry-card-${data.zoneId}`;
-    newCard.className = "p-3.5 bg-white rounded border border-gov-100 shadow-sm transition-all duration-300";
+    newCard.className = "tcard";
     newCard.innerHTML = cardContent;
     container.appendChild(newCard);
   }

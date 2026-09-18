@@ -6,6 +6,17 @@
   <title>CLAIRVEIL Ops Room — MoDNER Portal</title>
 
   <!-- Tailwind CSS CDN -->
+  <script>
+    // Applied before paint so the page never flashes the wrong theme
+    (function () {
+      try {
+        var saved = localStorage.getItem("clairveil-theme");
+        var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (saved === "dark" || (!saved && prefersDark)) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    })();
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet CSS -->
@@ -46,17 +57,71 @@
   </script>
 
   <style>
-    body { background-color: #EEF3F9; background-image: linear-gradient(180deg, #E7EEF7 0%, #F5F8FC 320px, #F5F8FC 100%); }
+    body {
+      background-color: #DBE9F4;
+      color: #062240;
+      transition: background-color .2s ease, color .2s ease;
+    }
     #map { height: 480px; width: 100%; border-radius: 0.375rem; }
+
     /* Tricolour hairline, as used on Indian government portals */
     .tricolour { height: 4px; background: linear-gradient(to right, #FF9933 0 33.33%, #FFFFFF 33.33% 66.66%, #138808 66.66% 100%); }
+
     /* Section heading with a saffron marker */
     .sec-title { position: relative; padding-left: 0.85rem; }
     .sec-title::before { content: ""; position: absolute; left: 0; top: 0.18rem; bottom: 0.18rem; width: 4px; background: #E8850C; border-radius: 2px; }
-    .panel { background: #fff; border: 1px solid #CBD9E8; border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(6,34,64,.06); }
-    .panel-head { background: #F3F7FC; border-bottom: 1px solid #CBD9E8; border-radius: 0.5rem 0.5rem 0 0; }
+
+    .panel { background: #fff; border: 1px solid #C2D6E8; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(6,34,64,.07); }
+    .panel-head { background: #EEF4FA; border-bottom: 1px solid #C2D6E8; border-radius: 0.5rem 0.5rem 0 0; }
+
     input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 9999px; background: #0B3C6E; cursor: pointer; }
     .leaflet-popup-content-wrapper { border-radius: 6px; }
+
+    /* ---------- Live telemetry cards ---------- */
+    .tcard {
+      background: #fff;
+      border: 1px solid #C2D6E8;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(6,34,64,.10), 0 1px 2px rgba(6,34,64,.06);
+      transition: box-shadow .2s ease, transform .2s ease, background-color .2s ease, border-color .2s ease;
+    }
+    .tcard:hover { box-shadow: 0 4px 10px rgba(6,34,64,.13); transform: translateY(-1px); }
+    .tcard-accent { height: 5px; width: 100%; }
+    .tcard-metric { background: #F3F8FC; border: 1px solid #DCE9F4; border-radius: 0.375rem; }
+
+    /* ---------- Dark mode ---------- */
+    html.dark body { background-color: #0A1622; color: #E3ECF7; }
+    html.dark .panel,
+    html.dark .tcard { background: #122235; border-color: #1E3A55; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+    html.dark .tcard:hover { box-shadow: 0 4px 12px rgba(0,0,0,.55); }
+    html.dark .panel-head { background: #0E1B2B; border-color: #1E3A55; }
+    html.dark .tcard-metric { background: #0E1B2B; border-color: #1E3A55; }
+
+    html.dark .bg-white { background-color: #122235 !important; }
+    html.dark .bg-gov-50 { background-color: #0E1B2B !important; }
+    html.dark .bg-gov-100 { background-color: #1B3350 !important; }
+    html.dark .border-gov-100 { border-color: #1E3A55 !important; }
+    html.dark .text-gov-900, html.dark .text-gov-950 { color: #E3ECF7 !important; }
+    html.dark .text-gov-950\/80 { color: #C3D4E6 !important; }
+    html.dark .text-gov-950\/70 { color: #A9BED4 !important; }
+    html.dark .text-gov-950\/50 { color: #7E93AB !important; }
+    html.dark .bg-saffron-100 { background-color: #2A1D0B !important; }
+    html.dark .text-saffron-600 { color: #F2A65A !important; }
+    html.dark .bg-emerald-50 { background-color: #0C2A1E !important; }
+    html.dark .text-emerald-800 { color: #6EE7B7 !important; }
+    html.dark .border-emerald-200 { border-color: #1C4D38 !important; }
+    html.dark select, html.dark textarea, html.dark input[type="file"] { background-color: #0E1B2B; color: #E3ECF7; border-color: #1E3A55; }
+    html.dark input[type="range"] { background-color: #1B3350; }
+    html.dark input[type="range"]::-webkit-slider-thumb { background: #E8850C; }
+    html.dark .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+    html.dark .leaflet-popup-content-wrapper, html.dark .leaflet-popup-tip { background: #122235; color: #E3ECF7; }
+
+    /* Theme toggle icons */
+    html.dark .icon-sun { display: block; }
+    html.dark .icon-moon { display: none; }
+    .icon-sun { display: none; }
+    .icon-moon { display: block; }
   </style>
 </head>
 <body class="text-gov-950 font-sans min-h-screen flex flex-col">
@@ -95,6 +160,12 @@
           <span class="w-2 h-2 rounded-full bg-saffron-400"></span>
           ML ENGINE: <strong class="font-semibold">XGBoost Autonomous</strong>
         </span>
+        <button id="themeToggle" type="button" title="Switch between light and dark mode"
+          class="inline-flex items-center gap-1.5 bg-gov-950/60 border border-white/15 rounded px-2.5 py-1 hover:bg-gov-950 transition">
+          <svg class="icon-moon w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+          <svg class="icon-sun w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm0-19a1 1 0 0 1 1 1V3a1 1 0 1 1-2 0V1.5a1 1 0 0 1 1-1zM2.5 11H4a1 1 0 1 1 0 2H2.5a1 1 0 1 1 0-2zm17.5 0h1.5a1 1 0 1 1 0 2H20a1 1 0 1 1 0-2zM4.9 4.9a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm11.8 11.8a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zM19.1 4.9a1 1 0 0 1 0 1.4l-1 1a1 1 0 1 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0zM7.3 16.7a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0z"/></svg>
+          <span id="themeLabel">Dark mode</span>
+        </button>
       </div>
     </div>
 
@@ -304,6 +375,26 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/app.js"></script>
+
+  <script>
+    // Light / dark mode toggle
+    (function () {
+      var btn = document.getElementById("themeToggle");
+      var label = document.getElementById("themeLabel");
+      function sync() {
+        var dark = document.documentElement.classList.contains("dark");
+        if (label) label.textContent = dark ? "Light mode" : "Dark mode";
+      }
+      sync();
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var dark = document.documentElement.classList.toggle("dark");
+          try { localStorage.setItem("clairveil-theme", dark ? "dark" : "light"); } catch (e) {}
+          sync();
+        });
+      }
+    })();
+  </script>
 
 </body>
 </html>
